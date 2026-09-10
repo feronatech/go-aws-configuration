@@ -5,23 +5,10 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
-
 concurrency:
   group: cve-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   cve:
-    runs-on: ubuntu-slim
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up Golang
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: 'go.mod'
-      
-      - name: Check CVEs using golvulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0 && govulncheck ./...
+    uses: feronatech/shared-workflows/.github/workflows/go-cve.yml@main

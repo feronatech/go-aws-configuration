@@ -5,23 +5,10 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
-
 concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
-    runs-on: ubuntu-slim
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up Golang
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: 'go.mod'
-      
-      - name: Run tests
-        run: go test -v ./...
+    uses: feronatech/shared-workflows/.github/workflows/go-test.yml@main

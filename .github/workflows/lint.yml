@@ -5,25 +5,10 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
-
 concurrency:
   group: lint-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   lint:
-    runs-on: ubuntu-slim
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up Golang
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: 'go.mod'
-      
-      - name: Run linting using golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.13
+    uses: feronatech/shared-workflows/.github/workflows/go-lint.yml@main
