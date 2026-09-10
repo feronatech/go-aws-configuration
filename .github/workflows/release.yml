@@ -27,13 +27,13 @@ jobs:
     with:
       wait-for-checks: "cve.yml,lint.yml,test.yml"
       release-body: |
-            **Installation:**
-            ```bash
-            go get github.com/feronatech/go-aws-configuration@v${{ needs.version.outputs.version }}
-            ```
-            **Usage:**
-            ```go
-            import "github.com/feronatech/go-aws-configuration/configuration"
+        **Installation:**
+        ```bash
+        go get github.com/feronatech/go-aws-configuration@v${{ needs.version.outputs.version }}
+        ```
+        **Usage:**
+        ```go
+        import "github.com/feronatech/go-aws-configuration/configuration"
 
-            logger := NewLogger("us-east-1", "dev", "myapp")
-            ```
+        logger := NewLogger("us-east-1", "dev", "myapp")
+        ```
