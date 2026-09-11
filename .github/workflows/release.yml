@@ -35,5 +35,5 @@ jobs:
         ```go
         import "github.com/feronatech/go-aws-configuration/configuration"
 
-        logger := NewLogger("us-east-1", "dev", "myapp")
+        cfg, err := configuration.Load[ConfigObj](configuration.WithEnvironment())
         ```
