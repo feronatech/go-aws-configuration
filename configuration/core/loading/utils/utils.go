@@ -78,7 +78,7 @@ func SetValue(v reflect.Value, raw string) error {
 		v.SetFloat(f)
 	case reflect.Slice:
 		return setSlice(v, raw)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if v.IsNil() {
 			v.Set(reflect.New(v.Type().Elem()))
 		}

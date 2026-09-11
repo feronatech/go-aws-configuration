@@ -26,6 +26,10 @@ type ConfigA struct {
 	}
 }
 
+func cleanup(t *testing.T, file *os.File) {
+	_ = os.Remove(file.Name())
+}
+
 func Test_Load_Nested(t *testing.T) {
 	region := "us-east-1"
 	postgresURL := "postgres://localhost/app"
@@ -89,9 +93,9 @@ HTTP_TIMEOUT=` + httpTimeout + `
 `
 
 	f, _ := os.CreateTemp("", "sample.env")
-	defer os.Remove(f.Name())
-	f.WriteString(fakeDotEnv)
-	f.Close()
+	defer cleanup(t, f)
+	_, _ = f.WriteString(fakeDotEnv)
+	_ = f.Close()
 
 	cfg, err := Load[ConfigB](WithDotEnv(f.Name()))
 	if err != nil {
@@ -164,9 +168,9 @@ LOG_LEVEL=ERROR
 	t.Setenv("LOG_LEVEL", "DEBUG")
 
 	f, _ := os.CreateTemp("", "sample.env")
-	defer os.Remove(f.Name())
-	f.WriteString(fakeDotEnv)
-	f.Close()
+	defer cleanup(t, f)
+	_, _ = f.WriteString(fakeDotEnv)
+	_ = f.Close()
 
 	cfg, err := Load[ConfigB](WithDotEnv(f.Name()), WithEnvironment())
 	if err != nil {
