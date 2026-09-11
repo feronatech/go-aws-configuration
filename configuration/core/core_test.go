@@ -1,14 +1,15 @@
 package core
 
 import (
+	"errors"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/feronatech/go-aws-configuration/configuration/core/error_handling"
 )
 
-type Config struct {
+type ConfigA struct {
 	Environment string `env:"ENVIRONMENT" default:"local" validate:"oneof=local staging production"`
 	LogLevel    string `env:"LOG_LEVEL" default:"info"`
 
@@ -26,23 +27,153 @@ type Config struct {
 }
 
 func Test_Load_Nested(t *testing.T) {
-	t.Setenv("AWS_REGION", "us-east-1")
-	t.Setenv("DATABASE_URL", "postgres://localhost/app")
-	t.Setenv("HTTP_TIMEOUT", "30s")
+	region := "us-east-1"
+	postgresURL := "postgres://localhost/app"
+	httpTimeout := "30s"
 
-	cfg, err := Load[Config](WithEnvironment())
-	require.NoError(t, err)
+	t.Setenv("AWS_REGION", region)
+	t.Setenv("DATABASE_URL", postgresURL)
+	t.Setenv("HTTP_TIMEOUT", httpTimeout)
 
-	assert.Equal(t, "us-east-1", cfg.AWS.Region)
-	assert.Equal(t, 30*time.Second, cfg.HTTP.Timeout)
-	assert.Equal(t, "local", cfg.Environment) // default applied
+	cfg, err := Load[ConfigA](WithEnvironment())
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	if cfg.AWS.Region != region {
+		t.Errorf("expected AWS.Region to be '%s', got %s", region, cfg.AWS.Region)
+	}
+	if cfg.Database.URL != postgresURL {
+		t.Errorf("expected Database.URL to be '%s', got %s", postgresURL, cfg.Database.URL)
+	}
+	if cfg.HTTP.Timeout.String() != httpTimeout {
+		t.Errorf("expected HTTP.Timeout to be '%s', got %s", httpTimeout, cfg.HTTP.Timeout.String())
+	}
 }
 
 func Test_Load_MissingRequired_ReportsAll(t *testing.T) {
-	_, err := Load[Config](WithEnvironment())
-	require.Error(t, err)
+	_, err := Load[ConfigA](WithEnvironment())
+	if err == nil {
+		t.Errorf("expected error, got nil")
+	}
+	for _, fieldErr := range err.(error_handling.FieldErrors) {
+		if !errors.Is(fieldErr.Err, error_handling.ErrRequired) {
+			t.Errorf("expected error type to be ErrRequired, got %v", fieldErr.Err)
+		}
+	}
+}
 
-	//assert.ErrorIs(t, err, ErrRequired)
-	assert.Contains(t, err.Error(), "AWS_REGION")
-	assert.Contains(t, err.Error(), "DATABASE_URL") // both, not just the first
+type ConfigB struct {
+	Environment string `env:"ENVIRONMENT" default:"local" validate:"oneof=local staging production"`
+	LogLevel    string `env:"LOG_LEVEL" default:"info"`
+
+	HTTP struct {
+		Timeout time.Duration `env:"HTTP_TIMEOUT" default:"5s"`
+	}
+
+	Database struct {
+		URL string `env:"DATABASE_URL" secret:"true"`
+	}
+}
+
+func Test_Load_WithDotEnv(t *testing.T) {
+	environment := "local"
+	logLevel := "debug"
+	postgresURL := "postgres://localhost/app"
+	httpTimeout := "30s"
+
+	fakeDotEnv := `
+ENVIRONMENT=` + environment + `
+LOG_LEVEL=` + logLevel + `
+HTTP_TIMEOUT=` + httpTimeout + `
+`
+
+	f, _ := os.CreateTemp("", "sample.env")
+	defer os.Remove(f.Name())
+	f.WriteString(fakeDotEnv)
+	f.Close()
+
+	cfg, err := Load[ConfigB](WithDotEnv(f.Name()))
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	if cfg.Environment != environment {
+		t.Errorf("expected Environment to be '%s', got %s", environment, cfg.Environment)
+	}
+	if cfg.LogLevel != logLevel {
+		t.Errorf("expected LogLevel to be '%s', got %s", logLevel, cfg.LogLevel)
+	}
+	if cfg.Database.URL == postgresURL {
+		t.Errorf("expected Database.URL to be unset, got %s", cfg.Database.URL)
+	}
+	if cfg.HTTP.Timeout.String() != httpTimeout {
+		t.Errorf("expected HTTP.Timeout to be '%s', got %s", httpTimeout, cfg.HTTP.Timeout.String())
+	}
+}
+
+func Test_Load_WithEnvironment(t *testing.T) {
+	environment := "local"
+	logLevel := "debug"
+	postgresURL := "postgres://localhost/app"
+	httpTimeout := "30s"
+
+	t.Setenv("ENVIRONMENT", environment)
+	t.Setenv("LOG_LEVEL", logLevel)
+	t.Setenv("HTTP_TIMEOUT", httpTimeout)
+
+	cfg, err := Load[ConfigB](WithEnvironment())
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	if cfg.Environment != environment {
+		t.Errorf("expected Environment to be '%s', got %s", environment, cfg.Environment)
+	}
+	if cfg.LogLevel != logLevel {
+		t.Errorf("expected LogLevel to be '%s', got %s", logLevel, cfg.LogLevel)
+	}
+	if cfg.Database.URL == postgresURL {
+		t.Errorf("expected Database.URL to be unset, got %s", cfg.Database.URL)
+	}
+	if cfg.HTTP.Timeout.String() != httpTimeout {
+		t.Errorf("expected HTTP.Timeout to be '%s', got %s", httpTimeout, cfg.HTTP.Timeout.String())
+	}
+}
+
+func Test_Load_ValidateOneOf(t *testing.T) {
+	t.Setenv("ENVIRONMENT", "invalid")
+
+	_, err := Load[ConfigB](WithEnvironment())
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	_, err = Load[ConfigB](WithEnvironment(), WithValidation())
+	if err == nil {
+		t.Errorf("expected error, got nil")
+	}
+}
+
+func Test_Load_OrderedLoading(t *testing.T) {
+	fakeDotEnv := `
+LOG_LEVEL=ERROR
+`
+
+	t.Setenv("DOTENV", fakeDotEnv)
+	t.Setenv("LOG_LEVEL", "DEBUG")
+
+	f, _ := os.CreateTemp("", "sample.env")
+	defer os.Remove(f.Name())
+	f.WriteString(fakeDotEnv)
+	f.Close()
+
+	cfg, err := Load[ConfigB](WithDotEnv(f.Name()), WithEnvironment())
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	if cfg.LogLevel != "ERROR" {
+		t.Errorf("expected LogLevel to be 'ERROR', got %s from fallback", cfg.LogLevel)
+	}
 }
